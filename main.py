@@ -489,6 +489,98 @@ def build_scatter_fig(df, x_col, y1_col, vendor1_label='PW', vendor2_label='HW')
     return fig
 
 
+def build_single_fig(df, x_col, y1_col, y1_style='scatter', vendor1_label='PW', vendor2_label='HW'):
+    """Builds and returns a Matplotlib Figure with two subplots (PW and HW) for a single Y metric.
+    y1_style can be 'scatter' or 'bar'. When 'bar', values are binned on X in 0.5 increments and the mean is plotted.
+    """
+
+    # 1. Data Cleaning and Conversion to Numeric
+    columns_to_keep = ['Source', x_col, y1_col]
+    df_plot = df.dropna(subset=columns_to_keep).copy()
+
+    for col in [x_col, y1_col]:
+        df_plot[col] = pd.to_numeric(df_plot[col], errors='coerce')
+    df_plot.dropna(subset=[x_col, y1_col], inplace=True)
+
+    if df_plot.empty:
+        print(f"\nError: Not enough data found for the selected columns ({x_col} and {y1_col}).")
+        return None
+
+    # Separate vendors
+    df_hw_plot = df_plot[df_plot['Source'] == vendor2_label].copy()
+    df_pw_plot = df_plot[df_plot['Source'] == vendor1_label].copy()
+
+    # Optional binning for bar style
+    pw_binned_y1 = None
+    hw_binned_y1 = None
+    if y1_style == 'bar':
+        df_hw_plot['x_bin'] = np.floor(df_hw_plot[x_col] * 2) / 2
+        df_pw_plot['x_bin'] = np.floor(df_pw_plot[x_col] * 2) / 2
+        hw_binned_y1 = df_hw_plot.groupby('x_bin')[y1_col].mean()
+        pw_binned_y1 = df_pw_plot.groupby('x_bin')[y1_col].mean()
+
+    # Axis limits
+    x_lim = CUSTOM_LIMITS.get(x_col)
+    y1_lim = CUSTOM_LIMITS.get(y1_col)
+
+    # Calculate global min/max for y1 across both vendors
+    global_y1_min = min(df_pw_plot[y1_col].min(), df_hw_plot[y1_col].min())
+    global_y1_max = max(df_pw_plot[y1_col].max(), df_hw_plot[y1_col].max())
+
+    # Apply custom limits if they exist for y1_col
+    if y1_col == PATHLOSS_COL and y1_lim:
+        global_y1_min, global_y1_max = y1_lim
+    elif y1_col != PATHLOSS_COL and global_y1_min >= 0:
+        global_y1_min = 0
+
+    # Default max to 1 if empty or 0
+    if pd.isna(global_y1_max) or global_y1_max == 0:
+        global_y1_max = 1
+
+    # 2. Create plot with two subplots
+    fig, axes = plt.subplots(1, 2, figsize=(15, 4.5))
+
+    # --- PW subplot ---
+    ax_pw = axes[0]
+    if y1_style == 'bar':
+        ax_pw.bar(pw_binned_y1.index, pw_binned_y1.values,
+                  label=f'{y1_col} (Bar Mean)', color='tab:orange', alpha=0.6, width=0.4)
+    else:
+        ax_pw.scatter(df_pw_plot[x_col], df_pw_plot[y1_col],
+                      label=f'{y1_col} (Scatter)', color='tab:orange', alpha=0.7, s=10)
+    if x_lim:
+        ax_pw.set_xlim(x_lim)
+    ax_pw.set_ylim(global_y1_min, global_y1_max)
+    ax_pw.set_title(f'{vendor1_label} Data: {y1_col} ({"Bar" if y1_style=="bar" else "Scatter"}) vs. {x_col}')
+    ax_pw.set_xlabel(x_col)
+    ax_pw.set_ylabel(y1_col, color='tab:orange')
+    ax_pw.grid(True, linestyle='--', alpha=0.7)
+    ax_pw.legend(loc='upper left')
+
+    # --- HW subplot ---
+    ax_hw = axes[1]
+    if y1_style == 'bar':
+        ax_hw.bar(hw_binned_y1.index, hw_binned_y1.values,
+                  label=f'{y1_col} (Bar Mean)', color='tab:blue', alpha=0.6, width=0.4)
+    else:
+        ax_hw.scatter(df_hw_plot[x_col], df_hw_plot[y1_col],
+                      label=f'{y1_col} (Scatter)', color='tab:blue', alpha=0.7, s=10)
+    if x_lim:
+        ax_hw.set_xlim(x_lim)
+    ax_hw.set_ylim(global_y1_min, global_y1_max)
+    ax_hw.set_title(f'{vendor2_label} Data: {y1_col} ({"Bar" if y1_style=="bar" else "Scatter"}) vs. {x_col}')
+    ax_hw.set_xlabel(x_col)
+    ax_hw.set_ylabel(y1_col, color='tab:blue')
+    ax_hw.grid(True, linestyle='--', alpha=0.7)
+    ax_hw.legend(loc='upper left')
+
+    # Main title
+    plt.suptitle(f'{y1_col} vs. {x_col} — {vendor1_label} / {vendor2_label} ({"Bar" if y1_style=="bar" else "Scatter"})', fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+    return fig
+
+
 if __name__ == "__main__":
     print("--- Interactive Dual-Axis Plot Generator Started ---")
 

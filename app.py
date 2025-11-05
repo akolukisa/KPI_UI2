@@ -4,6 +4,7 @@ from main import (
     load_data,
     build_dual_axis_fig,
     build_scatter_fig,
+    build_single_fig,
     guess_band_column,
     band_vendor_stats,
     sheet_name,
@@ -105,7 +106,7 @@ style_options = ["Scatter", "Bar"]
 charts_tab, dashboard_tab = st.tabs(["Charts", "Dashboard"])
 
 with charts_tab:
-    st.caption("Tip: When Y2 is None, charts render as scatter only.")
+    st.caption("İpucu: Y2 'None' ise, Y1 için seçtiğiniz stil uygulanır (Bar veya Scatter).")
     col1, col2, col3, col4, col5 = st.columns([1,1,1,1,1])
     with col1:
         x_col = st.selectbox("Select X metric", metric_options, index=0, help="Metric for X-axis")
@@ -122,11 +123,13 @@ with charts_tab:
 
     if run:
         if y2_sel == "None":
-            # Enforce scatter-only when Y2 is None
-            fig = build_scatter_fig(
+            # Apply selected style for Y1 when Y2 is None
+            left_style = 'bar' if y1_style == 'Bar' else 'scatter'
+            fig = build_single_fig(
                 df,
                 x_col,
                 y1_col,
+                y1_style=left_style,
                 vendor1_label=(vendor1_name_input or 'Vendor 1'),
                 vendor2_label=(vendor2_name_input or 'Vendor 2'),
             )
@@ -140,7 +143,7 @@ with charts_tab:
                     label="Download PNG",
                     data=buf.getvalue(),
                     file_name=(
-                        f"scatter_{(vendor1_name_input or 'Vendor 1')}_vs_{(vendor2_name_input or 'Vendor 2')}_{x_col}_vs_{y1_col}.png"
+                        f"single_{(vendor1_name_input or 'Vendor 1')}_vs_{(vendor2_name_input or 'Vendor 2')}_{x_col}_vs_{y1_col}_{left_style}.png"
                         .replace(" ", "_")
                         .replace("/", "_")
                     ),
